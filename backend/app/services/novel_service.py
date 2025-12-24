@@ -20,9 +20,13 @@ _PREFERRED_CONTENT_KEYS: tuple[str, ...] = (
 
 
 def _normalize_version_content(raw_content: Any, metadata: Any) -> str:
+    # 优先使用原始内容
+    text = _coerce_text(raw_content)
+    if text:
+        return text
+    
+    # 如果没有原始内容，尝试从元数据提取（兼容旧逻辑）
     text = _coerce_text(metadata)
-    if not text:
-        text = _coerce_text(raw_content)
     return text or ""
 
 
@@ -39,7 +43,7 @@ def _coerce_text(value: Any) -> Optional[str]:
                 nested = _coerce_text(value[key])
                 if nested:
                     return nested
-        return _clean_string(json.dumps(value, ensure_ascii=False))
+        return _clean_string(json.dumps(value, ensure_ascii=False), parse_json=False)
     if isinstance(value, (list, tuple, set)):
         parts = [text for text in (_coerce_text(item) for item in value) if text]
         if parts:
@@ -48,11 +52,11 @@ def _coerce_text(value: Any) -> Optional[str]:
     return _clean_string(str(value))
 
 
-def _clean_string(text: str) -> str:
+def _clean_string(text: str, parse_json: bool = True) -> str:
     stripped = text.strip()
     if not stripped:
         return stripped
-    if stripped.startswith("{") and stripped.endswith("}"):
+    if parse_json and stripped.startswith("{") and stripped.endswith("}"):
         try:
             parsed = json.loads(stripped)
             coerced = _coerce_text(parsed)
@@ -419,7 +423,10 @@ class NovelService:
         return versions
 
     async def select_chapter_version(self, chapter: Chapter, version_index: int) -> ChapterVersion:
-        versions = sorted(chapter.versions, key=lambda item: item.created_at)
+        stmt = select(ChapterVersion).where(ChapterVersion.chapter_id == chapter.id).order_by(ChapterVersion.created_at)
+        result = await self.session.execute(stmt)
+        versions = result.scalars().all()
+        
         if not versions or version_index < 0 or version_index >= len(versions):
             raise HTTPException(status_code=400, detail="版本索引无效")
         selected = versions[version_index]

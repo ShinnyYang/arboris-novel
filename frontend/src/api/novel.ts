@@ -14,6 +14,11 @@ const request = async (url: string, options: RequestInit = {}) => {
     ...options.headers
   })
 
+  // 如果 body 是 FormData，删除 Content-Type header，让浏览器自动设置（包含 boundary）
+  if (options.body instanceof FormData) {
+    headers.delete('Content-Type')
+  }
+
   if (authStore.isAuthenticated && authStore.token) {
     headers.set('Authorization', `Bearer ${authStore.token}`)
   }
@@ -153,6 +158,18 @@ export class NovelAPI {
     return request(NOVELS_BASE, {
       method: 'POST',
       body: JSON.stringify({ title, initial_prompt: initialPrompt })
+    })
+  }
+
+  static async importNovel(file: File): Promise<{ id: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request(`${NOVELS_BASE}/import`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // 让 browser 自动设置 Content-Type 为 multipart/form-data，不手动设置
+      }
     })
   }
 

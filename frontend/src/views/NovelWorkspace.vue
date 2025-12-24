@@ -91,6 +91,39 @@
               <span class="font-semibold">创建新项目</span>
             </div>
           </div>
+
+          <!-- 导入项目卡片 -->
+          <div
+            @click="triggerImport"
+            class="flex items-center justify-center p-5 bg-transparent border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-50 hover:border-teal-400 transition-colors duration-300 cursor-pointer group min-h-[180px]"
+          >
+            <div class="text-center text-gray-500 group-hover:text-teal-500 transition-colors">
+              <div v-if="isImporting" class="flex flex-col items-center">
+                <div class="loader-sm mb-2"></div>
+                <span class="font-semibold">正在导入并分析...</span>
+              </div>
+              <div v-else>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="mx-auto h-8 w-8 mb-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span class="font-semibold">导入小说文件</span>
+              </div>
+            </div>
+          </div>
+          <input
+            type="file"
+            ref="fileInput"
+            accept=".txt"
+            class="hidden"
+            @change="handleFileImport"
+          />
         </div>
       </div>
     </div>
@@ -147,10 +180,15 @@ import { useNovelStore } from '@/stores/novel'
 import { useAuthStore } from '@/stores/auth'
 import ProjectCard from '@/components/ProjectCard.vue'
 import type { NovelProject, NovelProjectSummary } from '@/api/novel'
+import { NovelAPI } from '@/api/novel'
 
 const router = useRouter()
 const novelStore = useNovelStore()
 const authStore = useAuthStore()
+
+// 导入相关状态
+const fileInput = ref<HTMLInputElement | null>(null)
+const isImporting = ref(false)
 
 // 删除相关状态
 const showDeleteDialog = ref(false)
@@ -180,6 +218,37 @@ const enterProject = (project: NovelProjectSummary) => {
 
 const loadProjects = async () => {
   await novelStore.loadProjects()
+}
+
+// 导入相关方法
+const triggerImport = () => {
+  if (isImporting.value) return
+  fileInput.value?.click()
+}
+
+const handleFileImport = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  if (!file.name.endsWith('.txt')) {
+    alert('请上传 .txt 格式的文件')
+    return
+  }
+
+  isImporting.value = true
+  try {
+    const response = await NovelAPI.importNovel(file)
+    await loadProjects()
+    router.push(`/novel/${response.id}`)
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    alert(error.message || '导入失败，请重试')
+  } finally {
+    isImporting.value = false
+    // 清空 input，允许重复上传同一文件
+    target.value = ''
+  }
 }
 
 // 删除相关方法
@@ -227,3 +296,39 @@ onMounted(() => {
   loadProjects()
 })
 </script>
+
+<style scoped>
+.loader {
+  border: 4px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 4px solid #3498db;
+  width: 40px;
+  height: 40px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+
+.loader-sm {
+  border: 3px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 3px solid #2dd4bf; /* teal-400 */
+  width: 24px;
+  height: 24px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

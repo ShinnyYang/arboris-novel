@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict, List
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.dependencies import get_current_user
@@ -20,6 +20,7 @@ from ...schemas.novel import (
     NovelSectionType,
 )
 from ...schemas.user import UserInDB
+from ...services.import_service import ImportService
 from ...services.llm_service import LLMService
 from ...services.novel_service import NovelService
 from ...services.prompt_service import PromptService
@@ -65,6 +66,19 @@ async def create_novel(
     project = await novel_service.create_project(current_user.id, title, initial_prompt)
     logger.info("用户 %s 创建项目 %s", current_user.id, project.id)
     return await novel_service.get_project_schema(project.id, current_user.id)
+
+
+@router.post("/import", response_model=Dict[str, str], status_code=status.HTTP_201_CREATED)
+async def import_novel(
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+    current_user: UserInDB = Depends(get_current_user),
+) -> Dict[str, str]:
+    """上传并导入小说文件。"""
+    import_service = ImportService(session)
+    project_id = await import_service.import_novel_from_file(current_user.id, file)
+    logger.info("用户 %s 导入项目 %s", current_user.id, project_id)
+    return {"id": project_id}
 
 
 @router.get("", response_model=List[NovelProjectSummary])
