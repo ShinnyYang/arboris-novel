@@ -432,7 +432,7 @@ async def analyze_emotion_with_ai(
         raise HTTPException(status_code=400, detail="没有可分析的章节")
     
     # 使用AI分析
-    llm_service = LLMService()
+    llm_service = LLMService(session)
     
     prompt = f"""请分析以下小说章节的情感走向，为每个章节返回情感类型和强度。
 
