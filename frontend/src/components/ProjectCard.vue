@@ -33,7 +33,7 @@
             {{ project.genre || '未知类型' }} · {{ getStatusText }}
           </p>
           <p class="md-label-small mt-1" style="color: var(--md-on-surface-variant);">
-            最后编辑: {{ project.last_edited }}
+            最后编辑: {{ formatDateTime(project.last_edited) }}
           </p>
         </div>
       </div>
@@ -111,6 +111,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { NovelProjectSummary } from '@/api/novel'
+import { formatDateTime } from '@/utils/date'
 
 interface Props {
   project: NovelProjectSummary

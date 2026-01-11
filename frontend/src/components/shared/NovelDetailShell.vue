@@ -20,7 +20,7 @@
             {{ formattedTitle }}
           </h1>
           <p v-if="overviewMeta.updated_at" class="md-body-small" style="color: var(--md-on-surface-variant);">
-            最近更新：{{ overviewMeta.updated_at }}
+            最近更新：{{ formatDateTime(overviewMeta.updated_at) }}
           </p>
         </div>
 
@@ -238,6 +238,7 @@ import { useNovelStore } from '@/stores/novel'
 import { NovelAPI } from '@/api/novel'
 import { AdminAPI } from '@/api/admin'
 import type { NovelProject, NovelSectionResponse, NovelSectionType } from '@/api/novel'
+import { formatDateTime } from '@/utils/date'
 import BlueprintEditModal from '@/components/BlueprintEditModal.vue'
 import OverviewSection from '@/components/novel-detail/OverviewSection.vue'
 import WorldSettingSection from '@/components/novel-detail/WorldSettingSection.vue'
