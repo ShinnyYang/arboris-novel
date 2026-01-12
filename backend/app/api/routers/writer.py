@@ -312,8 +312,20 @@ async def select_chapter_version(
     await session.commit()
 
     # 异步触发向量化入库
-    ingest_service = ChapterIngestionService(session)
-    await ingest_service.ingest_chapter(project_id, request.chapter_number, selected_version.content)
+    try:
+        llm_service = LLMService(session)
+        ingest_service = ChapterIngestionService(llm_service=llm_service)
+        await ingest_service.ingest_chapter(
+            project_id=project_id,
+            chapter_number=request.chapter_number,
+            title=chapter.title or f"第{request.chapter_number}章",
+            content=selected_version.content,
+            summary=None
+        )
+        logger.info(f"章节 {request.chapter_number} 向量化入库成功")
+    except Exception as e:
+        logger.error(f"章节 {request.chapter_number} 向量化入库失败: {e}")
+        # 向量化失败不应阻止版本选择，仅记录错误
 
     chapter.status = "successful"
     await session.commit()
