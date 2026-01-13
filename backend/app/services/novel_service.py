@@ -386,6 +386,38 @@ class NovelService:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def update_or_create_outline(
+        self,
+        project_id: str,
+        chapter_number: int,
+        title: str,
+        summary: str,
+        metadata: Optional[dict] = None,
+    ) -> ChapterOutline:
+        """更新或创建章节大纲，支持 metadata 存储导演脚本等信息。"""
+        stmt = select(ChapterOutline).where(
+            ChapterOutline.project_id == project_id,
+            ChapterOutline.chapter_number == chapter_number,
+        )
+        result = await self.session.execute(stmt)
+        outline = result.scalars().first()
+        if outline:
+            outline.title = title
+            outline.summary = summary
+            if metadata is not None:
+                outline.metadata = metadata
+        else:
+            outline = ChapterOutline(
+                project_id=project_id,
+                chapter_number=chapter_number,
+                title=title,
+                summary=summary,
+                metadata=metadata,
+            )
+            self.session.add(outline)
+        await self.session.flush()
+        return outline
+
     async def get_or_create_chapter(self, project_id: str, chapter_number: int) -> Chapter:
         stmt = (
             select(Chapter)
@@ -414,7 +446,7 @@ class NovelService:
             version = ChapterVersion(
                 chapter_id=chapter.id,
                 content=text_content,
-                metadata=None,
+                metadata=extra,  # ✅ 落盘 metadata
                 version_label=f"v{index+1}",
             )
             self.session.add(version)
