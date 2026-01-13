@@ -503,11 +503,15 @@ const saveChapterChanges = async (updatedChapter: ChapterOutline) => {
 
 const evaluateChapter = async () => {
   if (selectedChapterNumber.value !== null) {
+    // 保存原始状态，用于失败时恢复
+    let previousStatus: string | undefined
+    
     try {
       // 在本地更新章节状态为evaluating以立即反映在UI上
       if (project.value?.chapters) {
         const chapter = project.value.chapters.find(ch => ch.chapter_number === selectedChapterNumber.value)
         if (chapter) {
+          previousStatus = chapter.generation_status // 保存原状态
           chapter.generation_status = 'evaluating'
         }
       }
@@ -518,11 +522,11 @@ const evaluateChapter = async () => {
     } catch (error) {
       console.error('评审章节失败:', error)
       
-      // 错误状态下恢复章节状态
+      // 错误状态下恢复章节状态为原始状态
       if (project.value?.chapters) {
         const chapter = project.value.chapters.find(ch => ch.chapter_number === selectedChapterNumber.value)
-        if (chapter) {
-          chapter.generation_status = 'successful' // 恢复为成功状态
+        if (chapter && previousStatus) {
+          chapter.generation_status = previousStatus // 恢复为原状态
         }
       }
       

@@ -393,22 +393,15 @@ async def evaluate_chapter(
     eval_prompt = await prompt_service.get_prompt("evaluation")
     if not eval_prompt:
         logger.warning("未配置名为 'evaluation' 的评审提示词，将跳过 AI 评审")
-        # 创建评审记录
-        from app.models.novel import ChapterEvaluation
-        evaluation_record = ChapterEvaluation(
-            chapter_id=chapter.id,
-            version_id=version_to_evaluate.id,
-            decision="skipped",
+        # 使用 add_chapter_evaluation 创建评审记录
+        await novel_service.add_chapter_evaluation(
+            chapter=chapter,
+            version=version_to_evaluate,
             feedback="未配置评审提示词",
-            score=None
+            decision="skipped"
         )
-        session.add(evaluation_record)
-        # 跳过评审时，恢复为原来的状态，而不是 successful
-        chapter.status = "successful"  # 恢复为生成成功状态
-        await session.commit()
         return await _load_project_schema(novel_service, project_id, current_user.id)
 
-    from app.models.novel import ChapterEvaluation
     try:
         evaluation_raw = await llm_service.get_llm_response(
             system_prompt=eval_prompt,
@@ -422,17 +415,14 @@ async def evaluate_chapter(
         if not evaluation_text or len(evaluation_text.strip()) == 0:
             raise ValueError("评审结果为空")
         
-        # 创建评审记录
-        evaluation_record = ChapterEvaluation(
-            chapter_id=chapter.id,
-            version_id=version_to_evaluate.id,
-            decision="reviewed",
+        # 使用 add_chapter_evaluation 创建评审记录
+        # 这会自动设置状态为 WAITING_FOR_CONFIRM
+        await novel_service.add_chapter_evaluation(
+            chapter=chapter,
+            version=version_to_evaluate,
             feedback=evaluation_text,
-            score=None  # 可以后续添加评分逻辑
+            decision="reviewed"
         )
-        session.add(evaluation_record)
-        chapter.status = "successful"
-        await session.commit()
         logger.info("项目 %s 第 %s 章评审成功", project_id, request.chapter_number)
     except Exception as exc:
         logger.exception("项目 %s 第 %s 章评审失败: %s", project_id, request.chapter_number, exc)
@@ -451,7 +441,10 @@ async def evaluate_chapter(
         chapter = result.scalars().first()
         
         if chapter:
-            # 创建失败记录
+            # 使用 add_chapter_evaluation 创建失败记录
+            # 注意：这里不能再用 add_chapter_evaluation，因为它会设置状态为 waiting_for_confirm
+            # 失败时应该设置为 evaluation_failed
+            from app.models.novel import ChapterEvaluation
             evaluation_record = ChapterEvaluation(
                 chapter_id=chapter.id,
                 version_id=version_to_evaluate.id,
