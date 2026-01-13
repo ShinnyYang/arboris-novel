@@ -305,8 +305,8 @@ export class NovelAPI {
     projectId: string,
     chapterNumber: number,
     content: string
-  ): Promise<NovelProject> {
-    return request(`${WRITER_BASE}/${projectId}/chapters/edit`, {
+  ): Promise<Chapter> {
+    return request(`${WRITER_BASE}/${projectId}/chapters/edit-fast`, {
       method: 'POST',
       body: JSON.stringify({
         chapter_number: chapterNumber,

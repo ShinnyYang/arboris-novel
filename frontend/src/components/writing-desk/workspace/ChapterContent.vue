@@ -1,9 +1,9 @@
 <!-- AIMETA P=章节内容_章节文本展示编辑|R=内容展示_编辑|NR=不含版本管理|E=component:ChapterContent|X=internal|A=内容组件|D=vue|S=dom|RD=./README.ai -->
 <template>
   <div class="space-y-6">
-    <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+    <div class="md-card md-card-filled p-4 mb-6" style="border-radius: var(--md-radius-lg); background-color: var(--md-success-container);">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2 text-green-800">
+        <div class="flex items-center gap-2" style="color: var(--md-on-success-container);">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
           </svg>
@@ -13,7 +13,7 @@
         <button
           v-if="selectedChapter.versions && selectedChapter.versions.length > 0"
           @click="$emit('showVersionSelector', true)"
-          class="text-green-700 hover:text-green-800 text-sm font-medium flex items-center gap-1"
+          class="md-btn md-btn-text md-ripple flex items-center gap-1"
         >
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
@@ -24,16 +24,16 @@
       </div>
     </div>
 
-    <div class="bg-gray-50 rounded-xl p-6">
+    <div class="md-card md-card-outlined p-6" style="border-radius: var(--md-radius-xl);">
       <div class="flex items-center justify-between mb-4 gap-3">
-        <h4 class="font-semibold text-gray-800">章节内容</h4>
+        <h4 class="md-title-medium font-semibold">章节内容</h4>
         <div class="flex items-center gap-3">
-          <div class="text-sm text-gray-500">
+          <div class="md-body-small md-on-surface-variant">
             约 {{ Math.round(cleanVersionContent(selectedChapter.content || '').length / 100) * 100 }} 字
           </div>
           <!-- 分层优化按钮 -->
           <button
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors duration-200 border-purple-200 text-purple-600 hover:bg-purple-50"
+            class="md-btn md-btn-tonal md-ripple flex items-center gap-1"
             @click="showOptimizer = true"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,8 +42,8 @@
             分层优化
           </button>
           <button
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors duration-200"
-            :class="selectedChapter.content ? 'border-indigo-200 text-indigo-600 hover:bg-indigo-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'"
+            class="md-btn md-btn-outlined md-ripple flex items-center gap-1"
+            :class="selectedChapter.content ? '' : 'opacity-50 cursor-not-allowed'"
             :disabled="!selectedChapter.content"
             @click="exportChapterAsTxt(selectedChapter)"
           >
@@ -55,7 +55,7 @@
         </div>
       </div>
       <div class="prose max-w-none">
-        <div class="whitespace-pre-wrap text-gray-700 leading-relaxed">{{ cleanVersionContent(selectedChapter.content || '') }}</div>
+        <div class="whitespace-pre-wrap leading-relaxed" style="color: var(--md-on-surface);">{{ cleanVersionContent(selectedChapter.content || '') }}</div>
       </div>
     </div>
 
@@ -63,20 +63,20 @@
     <Teleport to="body">
       <div
         v-if="showOptimizer"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        class="md-dialog-overlay"
         @click.self="showOptimizer = false"
       >
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
+        <div class="md-dialog m3-optimizer-dialog">
           <div class="p-6">
             <!-- 优化面板头部 -->
             <div class="flex items-center justify-between mb-6">
               <div>
-                <h3 class="text-xl font-bold text-gray-900">✨ 分层优化</h3>
-                <p class="text-sm text-gray-500 mt-1">选择一个维度进行深度优化，让文字更有灵魂</p>
+                <h3 class="md-headline-small font-semibold">✨ 分层优化</h3>
+                <p class="md-body-small md-on-surface-variant mt-1">选择一个维度进行深度优化，让文字更有灵魂</p>
               </div>
               <button
                 @click="showOptimizer = false"
-                class="text-gray-400 hover:text-gray-600 transition-colors"
+                class="md-icon-btn md-ripple"
               >
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -91,29 +91,29 @@
                 :key="dim.key"
                 @click="selectedDimension = dim.key"
                 :class="[
-                  'p-4 rounded-xl border-2 text-left transition-all duration-200',
+                  'md-card md-card-outlined p-4 text-left transition-all duration-200',
                   selectedDimension === dim.key
-                    ? 'border-purple-500 bg-purple-50'
-                    : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+                    ? 'm3-option-selected'
+                    : 'm3-option'
                 ]"
               >
                 <div class="flex items-center gap-3 mb-2">
                   <span class="text-2xl">{{ dim.icon }}</span>
-                  <span class="font-semibold text-gray-900">{{ dim.label }}</span>
+                  <span class="md-title-small font-semibold">{{ dim.label }}</span>
                 </div>
-                <p class="text-sm text-gray-600">{{ dim.description }}</p>
+                <p class="md-body-small md-on-surface-variant">{{ dim.description }}</p>
               </button>
             </div>
 
             <!-- 额外说明 -->
             <div class="mb-6">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
+              <label class="md-text-field-label mb-2">
                 额外优化指令（可选）
               </label>
               <textarea
                 v-model="additionalNotes"
                 rows="3"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                class="md-textarea w-full resize-none"
                 placeholder="例如：加强主角内心的挣扎感，让对话更有张力..."
               ></textarea>
             </div>
@@ -122,14 +122,14 @@
             <div class="flex justify-end gap-3">
               <button
                 @click="showOptimizer = false"
-                class="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+                class="md-btn md-btn-outlined md-ripple"
               >
                 取消
               </button>
               <button
                 @click="startOptimize"
                 :disabled="!selectedDimension || isOptimizing"
-                class="px-6 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                class="md-btn md-btn-filled md-ripple disabled:opacity-50 flex items-center gap-2"
               >
                 <svg v-if="isOptimizing" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
@@ -146,19 +146,19 @@
     <Teleport to="body">
       <div
         v-if="showOptimizeResult"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        class="md-dialog-overlay"
         @click.self="showOptimizeResult = false"
       >
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden m-4 flex flex-col">
-          <div class="p-6 border-b border-gray-200">
+        <div class="md-dialog m3-result-dialog flex flex-col">
+          <div class="p-6 border-b" style="border-bottom-color: var(--md-outline-variant);">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="text-xl font-bold text-gray-900">优化结果预览</h3>
-                <p class="text-sm text-gray-500 mt-1">{{ optimizeResultNotes }}</p>
+                <h3 class="md-headline-small font-semibold">优化结果预览</h3>
+                <p class="md-body-small md-on-surface-variant mt-1">{{ optimizeResultNotes }}</p>
               </div>
               <button
                 @click="showOptimizeResult = false"
-                class="text-gray-400 hover:text-gray-600 transition-colors"
+                class="md-icon-btn md-ripple"
               >
                 <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -168,20 +168,21 @@
           </div>
           <div class="flex-1 overflow-y-auto p-6">
             <div class="prose max-w-none">
-              <div class="whitespace-pre-wrap text-gray-700 leading-relaxed">{{ optimizedContent }}</div>
+              <div class="whitespace-pre-wrap leading-relaxed" style="color: var(--md-on-surface);">{{ optimizedContent }}</div>
             </div>
           </div>
-          <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <div class="p-6 border-t flex justify-end gap-3" style="border-top-color: var(--md-outline-variant);">
             <button
               @click="showOptimizeResult = false"
-              class="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+              class="md-btn md-btn-outlined md-ripple"
             >
               取消
             </button>
             <button
               @click="applyOptimization"
               :disabled="isApplying"
-              class="px-6 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              class="md-btn md-btn-filled md-ripple disabled:opacity-50 flex items-center gap-2"
+              style="background-color: var(--md-success); color: var(--md-on-success);"
             >
               <svg v-if="isApplying" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
@@ -252,8 +253,29 @@ const cleanVersionContent = (content: string): string => {
   if (!content) return ''
   try {
     const parsed = JSON.parse(content)
-    if (parsed && typeof parsed === 'object' && parsed.content) {
-      content = parsed.content
+    const extractContent = (value: any): string | null => {
+      if (!value) return null
+      if (typeof value === 'string') return value
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const nested = extractContent(item)
+          if (nested) return nested
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        for (const key of ['content', 'chapter_content', 'chapter_text', 'text', 'body', 'story']) {
+          if (value[key]) {
+            const nested = extractContent(value[key])
+            if (nested) return nested
+          }
+        }
+      }
+      return null
+    }
+    const extracted = extractContent(parsed)
+    if (extracted) {
+      content = extracted
     }
   } catch (error) {
     // not a json
@@ -346,3 +368,27 @@ const applyOptimization = async () => {
   }
 }
 </script>
+
+<style scoped>
+.m3-optimizer-dialog {
+  max-width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  border-radius: var(--md-radius-xl);
+}
+
+.m3-result-dialog {
+  max-width: min(900px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  border-radius: var(--md-radius-xl);
+}
+
+.m3-option {
+  border-color: var(--md-outline-variant);
+}
+
+.m3-option-selected {
+  border-color: var(--md-primary);
+  background-color: var(--md-primary-container);
+  box-shadow: var(--md-elevation-1);
+}
+</style>

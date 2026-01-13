@@ -1,33 +1,33 @@
 <!-- AIMETA P=写作台工作区_主编辑区域|R=章节编辑_生成|NR=不含侧边栏|E=component:WDWorkspace|X=ui|A=工作区|D=vue|S=dom,net|RD=./README.ai -->
 <template>
   <div class="flex-1 min-w-0 h-full">
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 h-full flex flex-col">
+    <div class="md-card md-card-elevated h-full flex flex-col" style="border-radius: var(--md-radius-xl);">
       <!-- 章节工作区头部 -->
-      <div v-if="selectedChapterNumber" class="border-b border-gray-100 p-6 flex-shrink-0">
+      <div v-if="selectedChapterNumber" class="md-card-header flex-shrink-0">
         <div class="flex items-center justify-between">
           <div>
             <div class="flex items-center gap-3 mb-2">
-              <h2 class="text-xl font-bold text-gray-900">第{{ selectedChapterNumber }}章</h2>
+              <h2 class="md-title-large font-semibold">第{{ selectedChapterNumber }}章</h2>
               <span
                 :class="[
-                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                  'md-chip',
                   isChapterCompleted(selectedChapterNumber)
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-600'
+                    ? 'm3-chip-success'
+                    : 'm3-chip-neutral'
                 ]"
               >
                 {{ isChapterCompleted(selectedChapterNumber) ? '已完成' : '未完成' }}
               </span>
             </div>
-            <h3 class="text-lg text-gray-700 mb-1">{{ selectedChapterOutline?.title || '未知标题' }}</h3>
-            <p class="text-sm text-gray-600">{{ selectedChapterOutline?.summary || '暂无章节描述' }}</p>
+            <h3 class="md-title-medium md-on-surface mb-1">{{ selectedChapterOutline?.title || '未知标题' }}</h3>
+            <p class="md-body-small md-on-surface-variant">{{ selectedChapterOutline?.summary || '暂无章节描述' }}</p>
           </div>
 
           <div class="flex items-center gap-2">
             <button
               v-if="isChapterCompleted(selectedChapterNumber)"
               @click="openEditModal"
-              class="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+              class="md-btn md-btn-tonal md-ripple flex items-center gap-2 whitespace-nowrap"
             >
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
@@ -37,7 +37,7 @@
             <button
               @click="confirmRegenerateChapter"
               :disabled="generatingChapter === selectedChapterNumber"
-              class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+              class="md-btn md-btn-filled md-ripple flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
             >
               <svg v-if="generatingChapter === selectedChapterNumber" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
@@ -52,7 +52,7 @@
       </div>
 
       <!-- 章节内容展示区 -->
-      <div class="flex-1 p-6 overflow-y-auto">
+      <div class="md-card-content flex-1 overflow-y-auto">
         <component
           :is="currentComponent"
           v-bind="currentComponentProps"
@@ -70,16 +70,16 @@
     </div>
 
     <!-- 编辑章节内容模态框 -->
-    <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full h-full flex flex-col">
+    <div v-if="showEditModal" class="md-dialog-overlay">
+      <div class="md-dialog w-full h-full max-w-5xl m3-editor-dialog">
         <!-- 模态框头部 -->
-        <div class="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 class="text-lg font-semibold text-gray-900">
+        <div class="flex items-center justify-between p-6 border-b" style="border-bottom-color: var(--md-outline-variant);">
+          <h3 class="md-title-large font-semibold">
             编辑第{{ selectedChapterNumber }}章内容
           </h3>
           <button
             @click="closeEditModal"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="md-icon-btn md-ripple"
           >
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -90,34 +90,34 @@
         <!-- 模态框内容 -->
         <div class="flex-1 p-6 overflow-hidden">
           <div class="flex flex-col h-full">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label class="md-text-field-label mb-2">
               章节内容
             </label>
             <textarea
               v-model="editingContent"
-              class="flex-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+              class="md-textarea flex-1 w-full resize-none"
               placeholder="请输入章节内容..."
               :disabled="isSaving"
             ></textarea>
-            <div class="text-sm text-gray-500 mt-2">
+            <div class="md-body-small md-on-surface-variant mt-2">
               字数统计: {{ editingContent.length }}
             </div>
           </div>
         </div>
 
         <!-- 模态框底部 -->
-        <div class="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+        <div class="flex items-center justify-end gap-3 p-6 border-t" style="border-top-color: var(--md-outline-variant);">
           <button
             @click="closeEditModal"
             :disabled="isSaving"
-            class="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+            class="md-btn md-btn-outlined md-ripple disabled:opacity-50"
           >
             取消
           </button>
           <button
             @click="saveEditedContent"
             :disabled="isSaving || !editingContent.trim()"
-            class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            class="md-btn md-btn-filled md-ripple disabled:opacity-50 flex items-center gap-2"
           >
             <svg v-if="isSaving" class="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
@@ -186,8 +186,29 @@ const cleanVersionContent = (content: string): string => {
   if (!content) return ''
   try {
     const parsed = JSON.parse(content)
-    if (parsed && typeof parsed === 'object' && parsed.content) {
-      content = parsed.content
+    const extractContent = (value: any): string | null => {
+      if (!value) return null
+      if (typeof value === 'string') return value
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const nested = extractContent(item)
+          if (nested) return nested
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        for (const key of ['content', 'chapter_content', 'chapter_text', 'text', 'body', 'story']) {
+          if (value[key]) {
+            const nested = extractContent(value[key])
+            if (nested) return nested
+          }
+        }
+      }
+      return null
+    }
+    const extracted = extractContent(parsed)
+    if (extracted) {
+      content = extracted
     }
   } catch (error) {
     // not a json
@@ -393,3 +414,21 @@ const currentComponentProps = computed(() => {
   }
 })
 </script>
+
+<style scoped>
+.m3-chip-success {
+  background-color: var(--md-success-container);
+  color: var(--md-on-success-container);
+}
+
+.m3-chip-neutral {
+  background-color: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+}
+
+.m3-editor-dialog {
+  max-width: min(1200px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  border-radius: var(--md-radius-xl);
+}
+</style>

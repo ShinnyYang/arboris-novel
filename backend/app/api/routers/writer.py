@@ -17,15 +17,18 @@ import logging
 import os
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ...core.config import settings
 from ...core.dependencies import get_current_user
-from ...db.session import get_session
-from ...models.novel import Chapter
+from ...db.session import AsyncSessionLocal, get_session
+from ...models.novel import Chapter, ChapterOutline, ChapterVersion
 from ...schemas.novel import (
+    Chapter as ChapterSchema,
+    ChapterGenerationStatus,
     DeleteChapterRequest,
     EditChapterRequest,
     EvaluateChapterRequest,
@@ -176,6 +179,65 @@ async def _rewrite_with_guardrails(
         logger.warning("未配置 rewrite_guardrails 提示词，跳过自动修复")
         return original_text
 
+
+async def _refresh_edit_summary_and_ingest(
+    project_id: str,
+    chapter_number: int,
+    content: str,
+    user_id: Optional[int],
+) -> None:
+    async with AsyncSessionLocal() as session:
+        llm_service = LLMService(session)
+
+        stmt = (
+            select(Chapter)
+            .options(selectinload(Chapter.selected_version))
+            .where(
+                Chapter.project_id == project_id,
+                Chapter.chapter_number == chapter_number,
+            )
+        )
+        result = await session.execute(stmt)
+        chapter = result.scalars().first()
+        if not chapter:
+            return
+
+        summary_text = None
+        try:
+            summary = await llm_service.get_summary(
+                content,
+                temperature=0.15,
+                user_id=user_id,
+            )
+            summary_text = remove_think_tags(summary)
+        except Exception as exc:
+            logger.warning("编辑章节后自动生成摘要失败: %s", exc)
+
+        if summary_text and chapter.selected_version and chapter.selected_version.content == content:
+            chapter.real_summary = summary_text
+            await session.commit()
+
+        try:
+            outline_stmt = select(ChapterOutline).where(
+                ChapterOutline.project_id == project_id,
+                ChapterOutline.chapter_number == chapter_number,
+            )
+            outline_result = await session.execute(outline_stmt)
+            outline = outline_result.scalars().first()
+            title = outline.title if outline and outline.title else f"第{chapter_number}章"
+            ingest_service = ChapterIngestionService(llm_service=llm_service)
+            await ingest_service.ingest_chapter(
+                project_id=project_id,
+                chapter_number=chapter_number,
+                title=title,
+                content=content,
+                summary=None,
+                user_id=user_id or 0,
+            )
+            logger.info("章节 %s 向量化入库成功", chapter_number)
+        except Exception as exc:
+            logger.error("章节 %s 向量化入库失败: %s", chapter_number, exc)
+
     rewrite_input = f"""
 [原文]
 {original_text}
@@ -194,6 +256,7 @@ async def _rewrite_with_guardrails(
             temperature=0.3,
             user_id=user_id,
             timeout=300.0,
+            response_format=None,
         )
         cleaned = remove_think_tags(response)
         logger.info("成功修复违规内容")
@@ -403,6 +466,7 @@ async def generate_chapter(
                 temperature=0.9,
                 user_id=current_user.id,
                 timeout=600.0,
+                response_format=None,
             )
             cleaned = remove_think_tags(response)
             normalized = unwrap_markdown_json(cleaned)
@@ -442,17 +506,39 @@ async def generate_chapter(
                     user_id=current_user.id,
                 )
 
+            def _extract_text(value: object) -> Optional[str]:
+                if not value:
+                    return None
+                if isinstance(value, str):
+                    return value
+                if isinstance(value, dict):
+                    for key in ("content", "chapter_content", "chapter_text", "text", "body", "story"):
+                        if value.get(key):
+                            nested = _extract_text(value.get(key))
+                            if nested:
+                                return nested
+                    return None
+                if isinstance(value, list):
+                    for item in value:
+                        nested = _extract_text(item)
+                        if nested:
+                            return nested
+                return None
+
+            parsed_json = None
+            extracted_text = None
             try:
-                result = json.loads(final_content)
-                result["guardrail"] = guardrail_metadata
-                result["chapter_mission"] = chapter_mission
-                return result
-            except json.JSONDecodeError:
-                return {
-                    "content": final_content,
-                    "guardrail": guardrail_metadata,
-                    "chapter_mission": chapter_mission,
-                }
+                parsed_json = json.loads(final_content)
+                extracted_text = _extract_text(parsed_json)
+            except Exception:
+                parsed_json = None
+
+            return {
+                "content": extracted_text or final_content,
+                "parsed_json": parsed_json,
+                "guardrail": guardrail_metadata,
+                "chapter_mission": chapter_mission,
+            }
         except HTTPException:
             raise
         except Exception as exc:
@@ -830,46 +916,139 @@ async def generate_chapters_outline(
 async def edit_chapter_content(
     project_id: str,
     request: EditChapterRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user: UserInDB = Depends(get_current_user),
 ) -> NovelProjectSchema:
     novel_service = NovelService(session)
-    llm_service = LLMService(session)
     
     await novel_service.ensure_project_owner(project_id, current_user.id)
     chapter = await novel_service.get_or_create_chapter(project_id, request.chapter_number)
     
-    # 更新内容
-    chapter.content = request.content
-    
-    # 重新生成摘要
-    try:
-        summary = await llm_service.get_summary(
-            request.content,
-            temperature=0.15,
-            user_id=current_user.id,
+    # 更新内容：优先更新选中版本，否则选最新版本或创建新版本
+    target_version = chapter.selected_version
+    if not target_version and chapter.versions:
+        target_version = sorted(chapter.versions, key=lambda item: item.created_at)[-1]
+
+    if target_version:
+        target_version.content = request.content
+        if not chapter.selected_version_id:
+            chapter.selected_version_id = target_version.id
+    else:
+        target_version = ChapterVersion(
+            chapter_id=chapter.id,
+            content=request.content,
+            version_label="manual_edit",
         )
-        chapter.real_summary = remove_think_tags(summary)
-    except Exception as e:
-        logger.warning(f"编辑章节后自动生成摘要失败: {e}")
+        session.add(target_version)
+        await session.flush()
+        chapter.selected_version_id = target_version.id
     
     chapter.status = "successful"
+    chapter.word_count = len(request.content or "")
     await session.commit()
-    
-    # 异步触发向量化入库
-    try:
-        llm_service = LLMService(session)
-        ingest_service = ChapterIngestionService(llm_service=llm_service)
-        await ingest_service.ingest_chapter(
-            project_id=project_id,
-            chapter_number=request.chapter_number,
-            title=chapter.title or f"第{request.chapter_number}章",
-            content=request.content,
-            summary=None
-        )
-        logger.info(f"章节 {request.chapter_number} 向量化入库成功")
-    except Exception as e:
-        logger.error(f"章节 {request.chapter_number} 向量化入库失败: {e}")
-        # 向量化失败不应阻止内容编辑，仅记录错误
-    
+
+    background_tasks.add_task(
+        _refresh_edit_summary_and_ingest,
+        project_id,
+        request.chapter_number,
+        request.content,
+        current_user.id,
+    )
+
     return await _load_project_schema(novel_service, project_id, current_user.id)
+
+
+@router.post("/novels/{project_id}/chapters/edit-fast", response_model=ChapterSchema)
+async def edit_chapter_content_fast(
+    project_id: str,
+    request: EditChapterRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user: UserInDB = Depends(get_current_user),
+) -> ChapterSchema:
+    novel_service = NovelService(session)
+
+    await novel_service.ensure_project_owner(project_id, current_user.id)
+    chapter = await novel_service.get_or_create_chapter(project_id, request.chapter_number)
+
+    target_version = chapter.selected_version
+    if not target_version and chapter.versions:
+        target_version = sorted(chapter.versions, key=lambda item: item.created_at)[-1]
+
+    if target_version:
+        target_version.content = request.content
+        if not chapter.selected_version_id:
+            chapter.selected_version_id = target_version.id
+    else:
+        target_version = ChapterVersion(
+            chapter_id=chapter.id,
+            content=request.content,
+            version_label="manual_edit",
+        )
+        session.add(target_version)
+        await session.flush()
+        chapter.selected_version_id = target_version.id
+
+    chapter.status = "successful"
+    chapter.word_count = len(request.content or "")
+    await session.commit()
+
+    background_tasks.add_task(
+        _refresh_edit_summary_and_ingest,
+        project_id,
+        request.chapter_number,
+        request.content,
+        current_user.id,
+    )
+
+    stmt = (
+        select(Chapter)
+        .options(
+            selectinload(Chapter.versions),
+            selectinload(Chapter.evaluations),
+            selectinload(Chapter.selected_version),
+        )
+        .where(
+            Chapter.project_id == project_id,
+            Chapter.chapter_number == request.chapter_number,
+        )
+    )
+    result = await session.execute(stmt)
+    chapter = result.scalars().first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+
+    outline_stmt = select(ChapterOutline).where(
+        ChapterOutline.project_id == project_id,
+        ChapterOutline.chapter_number == request.chapter_number,
+    )
+    outline_result = await session.execute(outline_stmt)
+    outline = outline_result.scalars().first()
+
+    title = outline.title if outline else f"第{request.chapter_number}章"
+    summary = outline.summary if outline else ""
+    real_summary = chapter.real_summary
+    content = chapter.selected_version.content if chapter.selected_version else None
+    versions = (
+        [v.content for v in sorted(chapter.versions, key=lambda item: item.created_at)]
+        if chapter.versions
+        else None
+    )
+    evaluation_text = None
+    if chapter.evaluations:
+        latest = sorted(chapter.evaluations, key=lambda item: item.created_at)[-1]
+        evaluation_text = latest.feedback or latest.decision
+    status_value = chapter.status or ChapterGenerationStatus.NOT_GENERATED.value
+
+    return ChapterSchema(
+        chapter_number=request.chapter_number,
+        title=title,
+        summary=summary,
+        real_summary=real_summary,
+        content=content,
+        versions=versions,
+        evaluation=evaluation_text,
+        generation_status=ChapterGenerationStatus(status_value),
+        word_count=chapter.word_count or 0,
+    )

@@ -57,7 +57,10 @@ def _clean_string(text: str, parse_json: bool = True) -> str:
     stripped = text.strip()
     if not stripped:
         return stripped
-    if parse_json and stripped.startswith("{") and stripped.endswith("}"):
+    if parse_json and (
+        (stripped.startswith("{") and stripped.endswith("}"))
+        or (stripped.startswith("[") and stripped.endswith("]"))
+    ):
         try:
             parsed = json.loads(stripped)
             coerced = _coerce_text(parsed)

@@ -11,6 +11,7 @@ export const useNovelStore = defineStore('novel', () => {
   const currentConversationState = ref<any>({})
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const pendingChapterEdits = new Map<string, string>()
 
   // Getters
   const projectsCount = computed(() => projects.value.length)
@@ -274,10 +275,58 @@ export const useNovelStore = defineStore('novel', () => {
 
   async function editChapterContent(projectId: string, chapterNumber: number, content: string) {
     error.value = null
+    const requestKey = `${projectId}:${chapterNumber}`
+    pendingChapterEdits.set(requestKey, content)
+    const project = currentProject.value
+    let previousContent: string | null = null
+    let previousWordCount: number | undefined
+    let versionIndex = -1
+    if (project) {
+      const chapter = project.chapters.find(ch => ch.chapter_number === chapterNumber)
+      if (chapter) {
+        previousContent = chapter.content ?? null
+        previousWordCount = chapter.word_count
+        chapter.content = content
+        chapter.generation_status = 'successful'
+        chapter.word_count = content.length
+        if (Array.isArray(chapter.versions) && previousContent !== null) {
+          versionIndex = chapter.versions.findIndex(v => v === previousContent)
+          if (versionIndex >= 0) {
+            chapter.versions.splice(versionIndex, 1, content)
+          }
+        }
+      }
+    }
     try {
-      const updatedProject = await NovelAPI.editChapterContent(projectId, chapterNumber, content)
-      currentProject.value = updatedProject // 更新 store
+      const updatedChapter = await NovelAPI.editChapterContent(projectId, chapterNumber, content)
+      if (pendingChapterEdits.get(requestKey) !== content) {
+        return
+      }
+      if (project) {
+        const chapters = project.chapters
+        const index = chapters.findIndex(ch => ch.chapter_number === chapterNumber)
+        if (index >= 0) {
+          chapters.splice(index, 1, updatedChapter)
+        } else {
+          chapters.push(updatedChapter)
+          chapters.sort((a, b) => a.chapter_number - b.chapter_number)
+        }
+      }
+      pendingChapterEdits.delete(requestKey)
     } catch (err) {
+      if (pendingChapterEdits.get(requestKey) === content) {
+        pendingChapterEdits.delete(requestKey)
+        if (project) {
+          const chapter = project.chapters.find(ch => ch.chapter_number === chapterNumber)
+          if (chapter) {
+            chapter.content = previousContent
+            chapter.word_count = previousWordCount
+            if (Array.isArray(chapter.versions) && versionIndex >= 0 && previousContent !== null) {
+              chapter.versions.splice(versionIndex, 1, previousContent)
+            }
+          }
+        }
+      }
       error.value = err instanceof Error ? err.message : '编辑章节内容失败'
       throw err
     }

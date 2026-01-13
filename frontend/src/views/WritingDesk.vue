@@ -1,6 +1,6 @@
 <!-- AIMETA P=写作台_章节编辑主页面|R=写作界面_章节管理|NR=不含详情展示|E=route:/novel/:id#component:WritingDesk|X=ui|A=写作台|D=vue|S=dom,net|RD=./README.ai -->
 <template>
-  <div class="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="m3-shell h-screen flex flex-col overflow-hidden">
     <WDHeader
       :project="project"
       :progress="progress"
@@ -16,25 +16,22 @@
       <!-- 加载状态 -->
       <div v-if="novelStore.isLoading" class="h-full flex justify-center items-center">
         <div class="text-center">
-          <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p class="text-gray-600">正在加载项目数据...</p>
+          <div class="md-spinner mx-auto mb-4"></div>
+          <p class="md-body-medium md-on-surface-variant">正在加载项目数据...</p>
         </div>
       </div>
 
       <!-- 错误状态 -->
       <div v-else-if="novelStore.error" class="text-center py-20">
-        <div class="bg-red-50 border border-red-200 rounded-xl p-8 max-w-md mx-auto">
-          <svg class="w-12 h-12 text-red-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-          </svg>
-          <h3 class="text-lg font-semibold text-red-900 mb-2">加载失败</h3>
-          <p class="text-red-700 mb-4">{{ novelStore.error }}</p>
-          <button
-            @click="loadProject"
-            class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            重新加载
-          </button>
+        <div class="md-card md-card-outlined p-8 max-w-md mx-auto" style="border-radius: var(--md-radius-xl);">
+          <div class="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style="background-color: var(--md-error-container);">
+            <svg class="w-6 h-6" style="color: var(--md-error);" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <h3 class="md-title-large mb-2" style="color: var(--md-on-surface);">加载失败</h3>
+          <p class="md-body-medium mb-4" style="color: var(--md-error);">{{ novelStore.error }}</p>
+          <button @click="loadProject" class="md-btn md-btn-tonal md-ripple">重新加载</button>
         </div>
       </div>
 
@@ -108,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import type { Chapter, ChapterOutline, ChapterGenerationResponse, ChapterVersion } from '@/api/novel'
@@ -205,9 +202,30 @@ const cleanVersionContent = (content: string): string => {
   // 尝试解析JSON，看是否是完整的章节对象
   try {
     const parsed = JSON.parse(content)
-    if (parsed && typeof parsed === 'object' && parsed.content) {
-      // 如果是章节对象，提取content字段
-      content = parsed.content
+    const extractContent = (value: any): string | null => {
+      if (!value) return null
+      if (typeof value === 'string') return value
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const nested = extractContent(item)
+          if (nested) return nested
+        }
+        return null
+      }
+      if (typeof value === 'object') {
+        for (const key of ['content', 'chapter_content', 'chapter_text', 'text', 'body', 'story']) {
+          if (value[key]) {
+            const nested = extractContent(value[key])
+            if (nested) return nested
+          }
+        }
+      }
+      return null
+    }
+    const extracted = extractContent(parsed)
+    if (extracted) {
+      // 如果是章节对象/数组，提取正文
+      content = extracted
     }
   } catch (error) {
     // 如果不是JSON，继续处理字符串
@@ -588,11 +606,66 @@ const handleGenerateOutline = async (numChapters: number) => {
 }
 
 onMounted(() => {
+  document.body.classList.add('m3-novel')
   loadProject()
+})
+
+onUnmounted(() => {
+  document.body.classList.remove('m3-novel')
 })
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+:global(body.m3-novel) {
+  --md-font-family: 'Manrope', 'Noto Sans SC', 'Noto Sans', 'PingFang SC', sans-serif;
+  --md-primary: #2563eb;
+  --md-primary-light: #4f7bf2;
+  --md-primary-dark: #1d4ed8;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #dbeafe;
+  --md-on-primary-container: #0f172a;
+  --md-secondary: #0f766e;
+  --md-secondary-light: #2dd4bf;
+  --md-secondary-dark: #0f766e;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #ccfbf1;
+  --md-on-secondary-container: #0f172a;
+  --md-surface: #ffffff;
+  --md-surface-dim: #f1f5f9;
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f8fafc;
+  --md-surface-container: #f1f5f9;
+  --md-surface-container-high: #e2e8f0;
+  --md-surface-container-highest: #dbe3ef;
+  --md-on-surface: #0f172a;
+  --md-on-surface-variant: #475569;
+  --md-outline: #d7dde5;
+  --md-outline-variant: #e2e8f0;
+  --md-error: #dc2626;
+  --md-error-container: #fee2e2;
+  --md-on-error: #ffffff;
+  --md-on-error-container: #7f1d1d;
+  color: var(--md-on-surface);
+  font-family: var(--md-font-family);
+}
+
+.m3-shell {
+  background: radial-gradient(1200px 600px at 15% -20%, rgba(37, 99, 235, 0.16), transparent 60%),
+    radial-gradient(900px 420px at 85% 0%, rgba(45, 212, 191, 0.12), transparent 55%),
+    linear-gradient(140deg, #f8fafc 0%, #eef2ff 45%, #ecfeff 100%);
+  color: var(--md-on-surface);
+  font-family: var(--md-font-family);
+  animation: m3-fade 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m3-shell {
+    animation: none;
+  }
+}
+
 /* 自定义样式 */
 .line-clamp-1 {
   display: -webkit-box;
@@ -621,28 +694,24 @@ onMounted(() => {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--md-surface-container);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--md-outline);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--md-on-surface-variant);
 }
 
 /* 动画效果 */
-.fade-in {
-  animation: fadeIn 0.6s ease-out;
-}
-
-@keyframes fadeIn {
+@keyframes m3-fade {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
